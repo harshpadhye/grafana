@@ -218,7 +218,7 @@ describe('PanelEditor', () => {
   });
 
   describe('When the scene is rebuilt underneath the editor', () => {
-    beforeAll(() => {
+    beforeEach(() => {
       setTestFlags({ dashboardNewLayouts: true });
     });
 

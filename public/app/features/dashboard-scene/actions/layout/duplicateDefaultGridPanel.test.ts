@@ -82,7 +82,7 @@ describe('duplicateDefaultGridPanel', () => {
 });
 
 describe('duplicateDefaultGridPanel (legacy mode)', () => {
-  beforeAll(() => {
+  beforeEach(() => {
     setTestFlags({ dashboardNewLayouts: false });
   });
 

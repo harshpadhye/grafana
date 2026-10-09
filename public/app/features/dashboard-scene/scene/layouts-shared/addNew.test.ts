@@ -173,7 +173,7 @@ describe('addNewTabTo', () => {
 });
 
 describe('addNewRowTo', () => {
-  beforeAll(() => {
+  beforeEach(() => {
     setTestFlags({ dashboardNewLayouts: true });
   });
 
