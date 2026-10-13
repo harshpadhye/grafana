@@ -47,7 +47,11 @@ test.describe(
       await expect(page.getByText('server = B, pod = Bob')).toBeVisible();
     });
 
-    test('should open panel inspect', async ({ gotoDashboardPage, page, selectors }) => {
+    test('should open and close panel inspector with keyboard shortcuts', async ({
+      gotoDashboardPage,
+      page,
+      selectors,
+    }) => {
       const dashboardPage = await gotoDashboardPage({ uid: 'edediimbjhdz4b/a-tall-dashboard' });
 
       // Find Panel #1 and press 'i' to open inspector
@@ -55,14 +59,17 @@ test.describe(
       await expect(panel1).toBeVisible();
       await panel1.press('i');
 
-      await expect(dashboardPage.getByGrafanaSelector(selectors.components.PanelInspector.Json.content)).toBeVisible();
+      const inspector = dashboardPage.getByGrafanaSelector(
+        selectors.components.Drawer.General.title('Inspect: Panel #1')
+      );
+      await expect(inspector).toBeVisible();
 
       // Press Escape to close tooltip on the close button
       await page.keyboard.press('Escape');
       // Press Escape to close inspector
       await page.keyboard.press('Escape');
 
-      await expect(page.getByTestId(selectors.components.PanelInspector.Json.content)).toBeHidden();
+      await expect(inspector).toBeHidden();
     });
   }
 );
