@@ -74,7 +74,8 @@ func New(cfg app.Config) (app.App, error) {
 				},
 			},
 		},
-		ManagedKinds: managedKinds,
+		ManagedKinds:          managedKinds,
+		VersionedCustomRoutes: buildSearchRoutes(runtimeCfg),
 	}
 
 	a, err := simple.NewApp(c)
@@ -90,10 +91,38 @@ func New(cfg app.Config) (app.App, error) {
 	return a, nil
 }
 
-// buildKindValidator types admission on each kind's hub version: the apiserver
-// converts a request to the preferred version before admission, whichever
-// version it was sent as. The object is checked against that version's schema
-// for the same reason.
+// The rule search routes. The apiserver parses each as a request on a resource
+// with this name, which the rules authorizer relies on to require list on the
+// rule kind it searches.
+const (
+	SearchAlertRulesResource     = "searchAlertRules"
+	SearchRecordingRulesResource = "searchRecordingRules"
+)
+
+// buildSearchRoutes wires the per-kind rule search handlers
+// (provided by the registry) to their namespaced routes. A route
+// is skipped when its handler is unset, so manifest validation without a
+// backing instance does not register a nil handler.
+func buildSearchRoutes(cfg config.RuntimeConfig) map[string]simple.AppVersionRouteHandlers {
+	handlers := simple.AppVersionRouteHandlers{}
+	for path, handler := range map[string]simple.AppCustomRouteHandler{
+		"/" + SearchAlertRulesResource:     cfg.SearchAlertRulesHandler,
+		"/" + SearchRecordingRulesResource: cfg.SearchRecordingRulesHandler,
+	} {
+		if handler == nil {
+			continue
+		}
+		handlers[simple.AppVersionRoute{Namespaced: true, Path: path, Method: simple.AppCustomRouteMethodPost}] = handler
+	}
+	if len(handlers) == 0 {
+		return nil
+	}
+	return map[string]simple.AppVersionRouteHandlers{"v0alpha1": handlers}
+}
+
+// buildKindValidator types admission on the hub version, converting objects the
+// apiserver hands over in the request version. The object is checked against
+// the hub version's schema for the same reason.
 func buildKindValidator(kind resource.Kind, cfg config.RuntimeConfig, md app.ManifestData) (*simple.Validator, error) {
 	switch kind.Kind() {
 	case "AlertRule":
