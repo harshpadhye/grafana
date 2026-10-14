@@ -1,8 +1,9 @@
 package kinds
 
 manifest: {
-	appName:       "alerting"
-	groupOverride: "rules.alerting.grafana.app"
+	appName:          "alerting"
+	groupOverride:    "rules.alerting.grafana.app"
+	preferredVersion: "v1beta1"
 	versions: {
 		"v0alpha1": {
 			codegen: {
@@ -14,6 +15,18 @@ manifest: {
 				recordingRulev0alpha1,
 				ruleSequencev0alpha1,
 				configv0alpha1,
+			]
+		}
+		// Config stays v0alpha1-only for now.
+		"v1beta1": {
+			codegen: {
+				ts: {enabled: true}
+				go: {enabled: true}
+			}
+			kinds: [
+				alertRulev1beta1,
+				recordingRulev1beta1,
+				ruleSequencev1beta1,
 			]
 		}
 	}
