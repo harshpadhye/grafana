@@ -21,6 +21,7 @@ export interface InspectErrorsAndNoticesTabState extends SceneObjectState {
   // The data source is only set when it provides a custom ErrorsAndNoticesInspector. Otherwise
   // the standard inspector is used, which works for any data source (including mixed).
   dataSource?: DataSourceApi;
+  onClose?: () => void;
 }
 
 export class InspectErrorsAndNoticesTab extends SceneObjectBase<InspectErrorsAndNoticesTabState> {
@@ -36,7 +37,7 @@ export class InspectErrorsAndNoticesTab extends SceneObjectBase<InspectErrorsAnd
 }
 
 function InspectErrorsAndNoticesTabRenderer({ model }: SceneComponentProps<InspectErrorsAndNoticesTab>) {
-  const { panelRef, dataSource } = model.useState();
+  const { panelRef, dataSource, onClose } = model.useState();
   const panel = panelRef.resolve();
   const context = panel.getPanelContext();
   const { activateNotices } = context;
@@ -46,19 +47,22 @@ function InspectErrorsAndNoticesTabRenderer({ model }: SceneComponentProps<Inspe
   const errors = panelData?.errors ?? (panelData?.error ? [panelData.error] : []);
 
   const CustomInspector = dataSource?.components?.ErrorsAndNoticesInspector;
+  const statusItems = snapshot.hostInitialized
+    ? snapshot.items
+    : [...getPanelDataStatusItems(panelData, panel.state._pluginLoadError), ...snapshot.items];
   if (CustomInspector) {
-    return panelData ? <CustomInspector datasource={dataSource} data={panelData.series} errors={errors} /> : null;
-  }
-  if (context.notices) {
+    const panelItems = statusItems.filter((item) => item.origin === 'panel' || item.origin === 'plugin-load');
     return (
       <PanelContextProvider value={context}>
-        <StandardErrorsAndNoticesInspector
-          statusItems={
-            snapshot.hostInitialized
-              ? snapshot.items
-              : [...getPanelDataStatusItems(panelData, panel.state._pluginLoadError), ...snapshot.items]
-          }
-        />
+        {panelItems.length > 0 && <StandardErrorsAndNoticesInspector statusItems={panelItems} onClose={onClose} />}
+        {panelData && <CustomInspector datasource={dataSource} data={panelData.series} errors={errors} />}
+      </PanelContextProvider>
+    );
+  }
+  if (context.notices || panel.state._pluginLoadError) {
+    return (
+      <PanelContextProvider value={context}>
+        <StandardErrorsAndNoticesInspector statusItems={statusItems} onClose={onClose} />
       </PanelContextProvider>
     );
   }

@@ -1,3 +1,4 @@
+import { getPanelDataStatusItems } from '@grafana/data/internal';
 import { Trans, t } from '@grafana/i18n';
 import {
   type SceneComponentProps,
@@ -11,7 +12,6 @@ import { Alert, Drawer, Tab, TabsBar } from '@grafana/ui';
 import {
   getDataSourceWithInspector,
   getDataSourceWithErrorsAndNoticesInspector,
-  hasErrorsOrNotices,
 } from 'app/features/dashboard/components/Inspector/hooks';
 import { supportsDataQuery } from 'app/features/dashboard/components/PanelEditor/utils';
 import { InspectTab } from 'app/features/inspector/types';
@@ -37,6 +37,8 @@ interface PanelInspectDrawerState extends SceneObjectState {
 
 export class PanelInspectDrawer extends SceneObjectBase<PanelInspectDrawerState> {
   static Component = PanelInspectRenderer;
+  private buildVersion = 0;
+  private retryTimer?: ReturnType<typeof setTimeout>;
 
   constructor(state: PanelInspectDrawerState) {
     super(state);
@@ -44,7 +46,38 @@ export class PanelInspectDrawer extends SceneObjectBase<PanelInspectDrawerState>
   }
 
   private _activationHandler() {
-    this.buildTabs(0);
+    const panel = this.state.panelRef.resolve();
+    const context = panel.getPanelContext();
+    const deactivate = context.activateNotices?.();
+    const update = () => {
+      void this.buildTabs(0);
+    };
+    let provider = sceneGraph.getData(panel);
+    let dataSubscription = provider.subscribeToState(update);
+    const unsubscribe = context.notices?.subscribe(update);
+    const panelSubscription = panel.subscribeToState((state, previous) => {
+      if (state.$data !== previous.$data) {
+        dataSubscription.unsubscribe();
+        provider = sceneGraph.getData(panel);
+        dataSubscription = provider.subscribeToState(update);
+      }
+      if (
+        state.$data !== previous.$data ||
+        state._pluginLoadError !== previous._pluginLoadError ||
+        state.pluginId !== previous.pluginId
+      ) {
+        update();
+      }
+    });
+    update();
+    return () => {
+      this.buildVersion++;
+      clearTimeout(this.retryTimer);
+      unsubscribe?.();
+      dataSubscription.unsubscribe();
+      panelSubscription.unsubscribe();
+      deactivate?.();
+    };
   }
 
   /**
@@ -52,13 +85,15 @@ export class PanelInspectDrawer extends SceneObjectBase<PanelInspectDrawerState>
    * That is why there is a retry argument here and a setTimeout, to try again a bit later.
    */
   async buildTabs(retry: number) {
+    const version = ++this.buildVersion;
+    clearTimeout(this.retryTimer);
     const panelRef = this.state.panelRef;
     const plugin = panelRef.resolve()?.getPlugin();
     const tabs: SceneInspectTab[] = [];
 
     if (!plugin) {
       if (retry < 2000) {
-        setTimeout(() => this.buildTabs(retry + 100), 100);
+        this.retryTimer = setTimeout(() => this.buildTabs(retry + 100), 100);
       } else {
         this.setState({ pluginNotLoaded: true });
       }
@@ -76,23 +111,39 @@ export class PanelInspectDrawer extends SceneObjectBase<PanelInspectDrawerState>
         if (dsWithInspector) {
           tabs.push(new InspectMetaDataTab({ panelRef, dataSource: dsWithInspector }));
         }
-
-        if (!panelRef.resolve().getPanelContext().notices && hasErrorsOrNotices(data.state.data)) {
-          const dsWithErrorsAndNotices = await getDataSourceWithErrorsAndNoticesInspector(data.state.data);
-          tabs.push(new InspectErrorsAndNoticesTab({ panelRef, dataSource: dsWithErrorsAndNotices }));
-        }
       }
 
-      if (panelRef.resolve().getPanelContext().notices) {
-        const panelData = sceneGraph.getData(panelRef.resolve()).state.data;
+      const panel = panelRef.resolve();
+      const panelData = sceneGraph.getData(panel).state.data;
+      const snapshot = panel.getPanelContext().notices?.getSnapshot();
+      const statusItems = snapshot?.hostInitialized
+        ? snapshot.items
+        : [...getPanelDataStatusItems(panelData, panel.state._pluginLoadError), ...(snapshot?.items ?? [])];
+      if (statusItems.length > 0) {
         const dataSource = await getDataSourceWithErrorsAndNoticesInspector(panelData);
-        tabs.push(new InspectErrorsAndNoticesTab({ panelRef, dataSource }));
+        tabs.push(new InspectErrorsAndNoticesTab({ panelRef, dataSource, onClose: this.onClose }));
       }
 
-      tabs.push(new InspectJsonTab({ panelRef, onClose: this.onClose }));
+      tabs.push(
+        this.state.tabs?.find((tab) => tab instanceof InspectJsonTab) ??
+          new InspectJsonTab({ panelRef, onClose: this.onClose })
+      );
     }
 
-    this.setState({ tabs });
+    if (version === this.buildVersion) {
+      // Notice/action updates must not remount tabs and discard inspector UI state.
+      const stableTabs = tabs.map((tab) => {
+        const previous = this.state.tabs?.find((candidate) => candidate.getTabValue() === tab.getTabValue());
+        if (previous instanceof InspectErrorsAndNoticesTab && tab instanceof InspectErrorsAndNoticesTab) {
+          return previous.state.dataSource === tab.state.dataSource ? previous : tab;
+        }
+        if (previous instanceof InspectMetaDataTab && tab instanceof InspectMetaDataTab) {
+          return previous.state.dataSource === tab.state.dataSource ? previous : tab;
+        }
+        return previous ?? tab;
+      });
+      this.setState({ tabs: stableTabs });
+    }
   }
 
   getDrawerTitle() {

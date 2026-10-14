@@ -10,6 +10,7 @@ import { selectors } from '@grafana/e2e-selectors';
 
 import { PanelChrome } from './PanelChrome';
 import { PanelContextProvider } from './PanelContext';
+import { PanelStatus } from './PanelStatus';
 import { PanelStatusActions } from './PanelStatusActions';
 import { usePanelNotices, usePanelStatusSnapshot } from './usePanelNotices';
 
@@ -17,6 +18,24 @@ function Reporter({ items }: { items: readonly PanelNotice[] }) {
   usePanelNotices(items);
   return <div>Visualization</div>;
 }
+
+it('groups action-free query notices in the popover but keeps a custom CTA notice separate', async () => {
+  const store = new PanelStatusStore();
+  const notice = { origin: 'notice' as const, severity: 'warning' as const, text: 'Partial result' };
+  store.setExternal([
+    { ...notice, id: 'A', refId: 'A' },
+    { ...notice, id: 'B', refId: 'B' },
+    { ...notice, id: 'C', refId: 'C', actions: [{ id: 'retry', label: 'Retry', onClick: jest.fn() }] },
+  ]);
+  render(
+    <PanelContextProvider value={{ notices: store, eventBus: new EventBusSrv(), eventsScope: 'panel' }}>
+      <PanelStatus />
+    </PanelContextProvider>
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'status' }));
+  expect(await screen.findByText('Partial result (A, B)')).toBeVisible();
+  expect(screen.getByText('Partial result')).toBeVisible();
+});
 
 it.each([false, true])(
   'settles inline notices and resolvers without stale callbacks (notices: %s)',

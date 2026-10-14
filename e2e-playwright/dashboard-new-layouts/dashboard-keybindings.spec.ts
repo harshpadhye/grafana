@@ -35,27 +35,19 @@ test.describe('Dashboard keybindings with new layouts', { tag: ['@dashboards'] }
     await expect(page.getByText('server = B, pod = Bob')).toBeVisible();
   });
 
-  test('should open and close panel inspector with keyboard shortcuts', async ({
-    gotoDashboardPage,
-    page,
-    selectors,
-    panels,
-  }) => {
+  test('should open panel inspect', async ({ gotoDashboardPage, page, selectors, panels }) => {
     const dashboardPage = await gotoDashboardPage({ uid: 'edediimbjhdz4b/a-tall-dashboard' });
     const panel1 = panels.getPanel('Panel #1');
     await expect(panel1).toBeVisible();
     await panel1.press('i');
 
-    const inspector = dashboardPage.getByGrafanaSelector(
-      selectors.components.Drawer.General.title('Inspect: Panel #1')
-    );
-    await expect(inspector).toBeVisible();
+    await expect(dashboardPage.getByGrafanaSelector(selectors.components.PanelInspector.Json.content)).toBeVisible();
 
     // Press Escape to close tooltip on the close button
     await page.keyboard.press('Escape');
     // Press Escape to close inspector
     await page.keyboard.press('Escape');
 
-    await expect(inspector).toBeHidden();
+    await expect(dashboardPage.getByGrafanaSelector(selectors.components.PanelInspector.Json.content)).toBeHidden();
   });
 });

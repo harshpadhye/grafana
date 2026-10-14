@@ -1,7 +1,7 @@
 import { css } from '@emotion/css';
 import * as React from 'react';
 
-import { type GrafanaTheme2 } from '@grafana/data';
+import { type GrafanaTheme2, type PanelStatusItem as RuntimePanelStatusItem } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
 import { t } from '@grafana/i18n';
 
@@ -13,6 +13,7 @@ import { Stack } from '../Layout/Stack/Stack';
 import { Toggletip } from '../Toggletip/Toggletip';
 
 import { usePanelContext } from './PanelContext';
+import { groupPanelStatusItems } from './groupPanelStatusItems';
 import { type PanelStatusItem, type PanelStatusSeverity } from './types';
 import { usePanelStatusSnapshot } from './usePanelNotices';
 
@@ -113,18 +114,27 @@ function PanelStatusPopover({
   const styles = useStyles2(getStyles);
   const [isOpen, setIsOpen] = React.useState(false);
   const topSeverity = getTopSeverity(items);
-  const sortedItems = [...items].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
+  const sortedItems: Array<PanelStatusItem & Partial<RuntimePanelStatusItem>> = [...items].sort(
+    (a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]
+  );
 
   const content = (
     <Stack direction="column" gap={1}>
-      {sortedItems.map((item, index) => (
-        <div key={`${item.severity}-${index}`} className={styles.item}>
-          <span className={styles.itemIcon}>
-            <Icon name={getSeverityIcon(item.severity)} className={styles[item.severity]} size="sm" />
-          </span>
-          <span className={styles.itemText}>{item.text}</span>
-        </div>
-      ))}
+      {groupPanelStatusItems(sortedItems).map((members, index) => {
+        const item = members[0];
+        const refIds = Array.from(new Set(members.flatMap((member) => (member.refId ? [member.refId] : []))));
+        return (
+          <div key={`${item.severity}-${index}`} className={styles.item}>
+            <span className={styles.itemIcon}>
+              <Icon name={getSeverityIcon(item.severity)} className={styles[item.severity]} size="sm" />
+            </span>
+            <span className={styles.itemText}>
+              {item.text}
+              {members.length > 1 && refIds.length > 0 && ` (${refIds.join(', ')})`}
+            </span>
+          </div>
+        );
+      })}
     </Stack>
   );
 

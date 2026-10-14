@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { DataSourceApi, EventBusSrv, getDefaultTimeRange, LoadingState } from '@grafana/data';
 import { PanelStatusStore } from '@grafana/data/internal';
@@ -12,6 +13,13 @@ class CustomDatasource extends DataSourceApi {
   testDatasource = jest.fn();
   components = { ErrorsAndNoticesInspector: () => <div>Datasource details</div> };
 }
+
+it('shows plugin-load errors even without a notice store or query data', () => {
+  const panel = new VizPanel({ $data: new SceneDataNode({}), _pluginLoadError: 'Plugin failed to load' });
+  const tab = new InspectErrorsAndNoticesTab({ panelRef: panel.getRef() });
+  render(<tab.Component model={tab} />);
+  expect(screen.getByText('Plugin failed to load')).toBeVisible();
+});
 
 it('shows query errors before host initialization and respects an initialized empty store', () => {
   const store = new PanelStatusStore();
@@ -43,7 +51,7 @@ it('shows query errors before host initialization and respects an initialized em
   expect(screen.queryByText('Query failed')).not.toBeInTheDocument();
 });
 
-it('uses a custom inspector instead of standard panel notices', () => {
+it('shows panel notices alongside the custom datasource inspector and closes only for Assistant', async () => {
   const store = new PanelStatusStore();
   const source = store.createSource();
   const onClick = jest.fn();
@@ -55,7 +63,10 @@ it('uses a custom inspector instead of standard panel notices', () => {
       actions: [{ id: 'choose', label: 'Choose field', onClick }],
     },
   ]);
-  const onInvestigateStatusItem = jest.fn();
+  const onInvestigateStatusItem = jest.fn(() =>
+    expect(store.getSnapshot().items[0].text).toBe('Choose a numeric field')
+  );
+  const onClose = jest.fn(() => store.clear());
   const context: PanelContext = {
     notices: store,
     eventsScope: 'panel',
@@ -63,7 +74,14 @@ it('uses a custom inspector instead of standard panel notices', () => {
     onInvestigateStatusItem,
   };
   const panel = new VizPanel({
-    $data: new SceneDataNode({ data: { series: [], state: LoadingState.Done, timeRange: getDefaultTimeRange() } }),
+    $data: new SceneDataNode({
+      data: {
+        series: [],
+        errors: [{ message: 'Custom query error' }],
+        state: LoadingState.Error,
+        timeRange: getDefaultTimeRange(),
+      },
+    }),
     extendPanelContext: (_, target) => Object.assign(target, context),
   });
   const datasource = new CustomDatasource({
@@ -76,11 +94,43 @@ it('uses a custom inspector instead of standard panel notices', () => {
     meta: {} as DataSourceApi['meta'],
     jsonData: {},
   });
-  const tab = new InspectErrorsAndNoticesTab({ panelRef: panel.getRef(), dataSource: datasource });
+  const tab = new InspectErrorsAndNoticesTab({ panelRef: panel.getRef(), dataSource: datasource, onClose });
   render(<tab.Component model={tab} />);
   expect(screen.getByText('Datasource details')).toBeVisible();
-  expect(screen.queryByText('Choose a numeric field')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Choose field' })).not.toBeInTheDocument();
-  expect(onClick).not.toHaveBeenCalled();
-  expect(onInvestigateStatusItem).not.toHaveBeenCalled();
+  expect(screen.queryByText('Custom query error')).not.toBeInTheDocument();
+  expect(screen.getByText('Choose a numeric field')).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Choose field' }));
+  expect(onClick).toHaveBeenCalledTimes(1);
+  expect(onClose).not.toHaveBeenCalled();
+  const id = store.getSnapshot().items[0].id;
+  await userEvent.click(screen.getByRole('button', { name: 'Explain with Assistant' }));
+  expect(onInvestigateStatusItem).toHaveBeenCalledWith(id);
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it('groups notice text while retaining per-query Assistant eligibility and custom actions', async () => {
+  const store = new PanelStatusStore();
+  const onInvestigateStatusItem = jest.fn();
+  const onClick = jest.fn();
+  const notice = { origin: 'notice' as const, severity: 'warning' as const, text: 'Partial result' };
+  store.setExternal([
+    { ...notice, id: 'A', refId: 'A' },
+    { ...notice, id: 'B', refId: 'B', assistant: 'hidden' },
+    { ...notice, id: 'C', refId: 'C', actions: [{ id: 'retry', label: 'Retry C', onClick }] },
+  ]);
+  const panel = new VizPanel({
+    $data: new SceneDataNode({ data: { series: [], state: LoadingState.Done, timeRange: getDefaultTimeRange() } }),
+    extendPanelContext: (_, context) => Object.assign(context, { notices: store, onInvestigateStatusItem }),
+  });
+  const tab = new InspectErrorsAndNoticesTab({ panelRef: panel.getRef() });
+  render(<tab.Component model={tab} />);
+  expect(screen.getAllByText('Partial result')).toHaveLength(2);
+  expect(screen.getByText('A')).toBeVisible();
+  expect(screen.getByText('B')).toBeVisible();
+  const assistantButtons = screen.getAllByRole('button', { name: 'Explain with Assistant' });
+  expect(assistantButtons).toHaveLength(2);
+  await userEvent.click(assistantButtons[0]);
+  expect(onInvestigateStatusItem).toHaveBeenCalledWith('external:A');
+  await userEvent.click(screen.getByRole('button', { name: 'Retry C' }));
+  expect(onClick).toHaveBeenCalledTimes(1);
 });

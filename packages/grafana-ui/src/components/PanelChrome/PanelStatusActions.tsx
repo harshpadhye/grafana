@@ -9,7 +9,7 @@ import { usePanelContext } from './PanelContext';
 import { usePanelStatusSnapshot } from './usePanelNotices';
 
 /** Status actions for the inspector. @alpha */
-export function PanelStatusActions({ statusItem }: { statusItem: PanelStatusItem }) {
+export function PanelStatusActions({ statusItem, onClose }: { statusItem: PanelStatusItem; onClose?: () => void }) {
   const { notices, onInvestigateStatusItem } = usePanelContext();
   const snapshot = usePanelStatusSnapshot(notices);
   const current = snapshot.items.find((item) => item.id === statusItem.id);
@@ -42,7 +42,14 @@ export function PanelStatusActions({ statusItem }: { statusItem: PanelStatusItem
             );
           })}
           {onInvestigateStatusItem && current.assistant !== 'hidden' && (
-            <Button variant="secondary" icon="ai-sparkle" onClick={() => onInvestigateStatusItem(current.id)}>
+            <Button
+              variant="secondary"
+              icon="ai-sparkle"
+              onClick={() => {
+                onInvestigateStatusItem(current.id);
+                onClose?.();
+              }}
+            >
               {current.severity === 'error'
                 ? t('grafana-ui.panel-chrome.fix-with-assistant', 'Fix with Assistant')
                 : t('grafana-ui.panel-chrome.explain-with-assistant', 'Explain with Assistant')}
