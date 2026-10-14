@@ -33,10 +33,6 @@ beforeEach(() => {
   setTestFlags({ [FlagKeys.TextNewFeatures]: true });
 });
 
-afterAll(() => {
-  setTestFlags({});
-});
-
 // applyFieldOverrides copies panel defaults through this registry, which app.ts seeds.
 standardFieldConfigEditorRegistry.setInit(getAllStandardFieldConfigs);
 

@@ -871,10 +871,6 @@ describe('DashboardScenePageStateManager v2', () => {
         setTestFlags({ 'grafana.dashboardGlobalVariables': true });
       });
 
-      afterEach(() => {
-        setTestFlags({});
-      });
-
       const predefinedVariable = {
         kind: 'CustomVariable' as const,
         spec: {
@@ -2104,9 +2100,8 @@ describe('DashboardScenePageStateManager v2', () => {
       });
     });
 
-    afterEach(async () => {
+    afterEach(() => {
       jest.restoreAllMocks();
-      setTestFlags({});
     });
 
     it('edit-template flow: sets isDashboardTemplate + dashboardTemplateUid, scene is clean', async () => {
@@ -2169,7 +2164,6 @@ describe('DashboardScenePageStateManager v2', () => {
 describe('UnifiedDashboardScenePageStateManager', () => {
   afterEach(() => {
     store.delete(DASHBOARD_FROM_LS_KEY);
-    setTestFlags({});
   });
 
   describe('when fetching/loading a dashboard', () => {

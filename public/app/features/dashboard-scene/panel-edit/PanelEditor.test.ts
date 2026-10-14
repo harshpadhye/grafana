@@ -222,9 +222,7 @@ describe('PanelEditor', () => {
       setTestFlags({ dashboardNewLayouts: true });
     });
 
-    afterAll(() => {
-      setTestFlags({});
-    });
+    afterAll(() => {});
 
     /** Replace the layout tree wholesale, as APPLY_SPEC and the json/code editors do. */
     function swapBody(dashboard: DashboardScene) {
@@ -385,7 +383,6 @@ describe('PanelEditor', () => {
 
       afterEach(() => {
         store.delete(QUERY_EDITOR_V2_PREFERENCE_KEY);
-        setTestFlags({});
       });
 
       it('should use the v2 query editor experience by default', async () => {
@@ -437,10 +434,6 @@ describe('PanelEditor', () => {
     });
 
     describe('when queryEditorNext feature toggle is disabled', () => {
-      beforeEach(() => {
-        setTestFlags({});
-      });
-
       afterEach(() => {
         store.delete(QUERY_EDITOR_V2_PREFERENCE_KEY);
       });

@@ -86,7 +86,6 @@ describe('dashboard tracking', () => {
     setTestFlags(defaultFlags);
   });
   afterEach(() => {
-    setTestFlags({});
     jest.clearAllMocks();
     jest.resetAllMocks();
   });
@@ -159,7 +158,6 @@ describe('dashboard tracking', () => {
 
   describe('dashboardSavedFromTemplate', () => {
     afterEach(() => {
-      setTestFlags({});
       locationService.push('/');
     });
 
@@ -293,9 +291,7 @@ describe('dashboard tracking', () => {
       setTestFlags({ 'grafana.newTextPanel': true, 'text.newFeatures': true, ...defaultFlags });
     });
 
-    afterEach(() => {
-      setTestFlags({});
-    });
+    afterEach(() => {});
 
     it('counts the features used by every text panel on the dashboard', () => {
       const scene = buildSceneWithTextPanels([

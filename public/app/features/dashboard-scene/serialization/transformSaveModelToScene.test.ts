@@ -874,10 +874,6 @@ describe('transformSaveModelToScene', () => {
     beforeEach(() => {
       setTestFlags({ dashboardNewLayouts: true, 'grafana.dashboardAutoGridDefault': false });
     });
-    afterEach(() => {
-      setTestFlags({});
-    });
-
     it('Should convert legacy rows to new rows', () => {
       const scene = transformSaveModelToScene(
         {
