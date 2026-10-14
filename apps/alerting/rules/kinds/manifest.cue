@@ -16,8 +16,9 @@ manifest: {
 				ruleSequencev0alpha1,
 				configv0alpha1,
 			]
+			routes: searchRoutes
 		}
-		// Config stays v0alpha1-only for now.
+		// Config and the rule search routes stay v0alpha1-only for now.
 		"v1beta1": {
 			codegen: {
 				ts: {enabled: true}
